@@ -1,0 +1,17 @@
+# 虛擬環境與快取
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 敏感環境變數
+.env
+
+# 本地測試資料庫
+messages.db
+*.sqlite
+*.sqlite3
+
+# 本地測試上傳的圖片
+static/uploads/*
+!static/uploads/.gitkeep

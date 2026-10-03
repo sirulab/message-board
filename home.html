@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖文留言板</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>發表一篇圖文</h1>
+
+        <form id="postForm">
+            <div class="form-group">
+                <label for="textInput">文字內容</label>
+                <input type="text" id="textInput" name="text" placeholder="請輸入留言文字..." required />
+            </div>
+
+            <div class="form-group">
+                <label for="imageInput">圖片檔案</label>
+                <input type="file" id="imageInput" name="image" accept="image/*" required />
+            </div>
+
+            <button type="submit" id="submitBtn">送出</button>
+            <span id="statusMsg" class="status-msg"></span>
+        </form>
+
+        <hr />
+
+        <h2>留言列表</h2>
+        <div id="my-container">
+            <p>載入中...</p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('postForm');
+        const textInput = document.getElementById('textInput');
+        const imageInput = document.getElementById('imageInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusMsg = document.getElementById('statusMsg');
+        const container = document.getElementById('my-container');
+
+        // 載入留言列表
+        function loadPosts() {
+            fetch('/api/posts')
+                .then(function(response) {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.detail || '載入失敗'); });
+                    }
+                    return response.json();
+                })
+                .then(function(apiData) {
+                    if (!apiData || apiData.length === 0) {
+                        container.innerHTML = '<p class="empty-tip">目前尚無留言。</p>';
+                        return;
+                    }
+                    const htmlString = apiData.map(function(item) {
+                        return `
+                            <div class="post-item">
+                                <p class="post-text">${escapeHtml(item.text)}</p>
+                                <img src="${item.imageUrl}" alt="圖片" loading="lazy" />
+                                ${item.createdAt ? `<div class="post-time">${item.createdAt}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                    container.innerHTML = htmlString;
+                })
+                .catch(function(error) {
+                    console.error('資料載入失敗：', error);
+                    container.innerHTML = `<p class="error-tip">資料載入失敗：${escapeHtml(error.message)}</p>`;
+                });
+        }
+
+        // 發表留言
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const text = textInput.value.trim();
+            const file = imageInput.files[0];
+
+            if (!text) {
+                alert('請輸入留言文字');
+                return;
+            }
+            if (!file) {
+                alert('請選擇圖片檔案');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('text', text);
+            formData.append('image', file);
+
+            submitBtn.disabled = true;
+            statusMsg.textContent = '上傳中...';
+
+            fetch('/api/posts', {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.detail || '上傳失敗'); });
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                statusMsg.textContent = '發表成功！';
+                textInput.value = '';
+                imageInput.value = '';
+                loadPosts();
+                setTimeout(() => { statusMsg.textContent = ''; }, 3000);
+            })
+            .catch(function(error) {
+                console.error('發表失敗：', error);
+                statusMsg.textContent = `失敗: ${error.message}`;
+            })
+            .finally(function() {
+                submitBtn.disabled = false;
+            });
+        });
+
+        // 簡單防止 XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 頁面載入時抓取留言
+        loadPosts();
+    </script>
+</body>
+</html>
